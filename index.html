@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI 팟캐스트 생성기</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        textarea, input { width: 100%; padding: 10px; margin-bottom: 15px; }
+        button { background: #4CAF50; color: white; padding: 10px 15px; border: none; cursor: pointer; }
+        button:hover { background: #45a049; }
+        #results { margin-top: 20px; }
+        .article { margin-bottom: 10px; padding: 10px; background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI 팟캐스트 생성기</h1>
+        
+        <form id="rssForm">
+            <label for="rssUrl">RSS URL:</label>
+            <input type="url" id="rssUrl" placeholder="https://example.com/rss.xml" required>
+            
+            <label for="keywords">검색어 (쉼표로 구분):</label>
+            <input type="text" id="keywords" placeholder="AI,기술,머신러닝">
+            
+            <button type="submit">검색</button>
+        </form>
+        
+        <div id="results"></div>
+        
+        <button id="downloadBtn" style="display:none;">주소 다운로드 (TXT)</button>
+    </div>
+
+    <script>
+        document.getElementById('rssForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const rssUrl = document.getElementById('rssUrl').value;
+            const keywords = document.getElementById('keywords').value.split(',').map(k => k.trim());
+            
+            const response = await fetch('/process-rss', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rssUrl, keywords })
+            });
+            
+            const data = await response.json();
+            displayResults(data.articles);
+        });
+        
+        function displayResults(articles) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+            
+            if (articles.length === 0) {
+                resultsDiv.innerHTML = '<p>검색 결과가 없습니다.</p>';
+                document.getElementById('downloadBtn').style.display = 'none';
+                return;
+            }
+            
+            articles.forEach(article => {
+                const articleDiv = document.createElement('div');
+                articleDiv.className = 'article';
+                articleDiv.innerHTML = `
+                    <h3><a href="${article.link}" target="_blank">${article.title}</a></h3>
+                    <p>${article.description || '설명 없음'}</p>
+                    <p class="link">${article.link}</p>
+                `;
+                resultsDiv.appendChild(articleDiv);
+            });
+            
+            document.getElementById('downloadBtn').style.display = 'block';
+            document.getElementById('downloadBtn').onclick = function() {
+                const links = articles.map(a => a.link).join('\n');
+                downloadAsTxt(links, 'ai_podcast_links.txt');
+            };
+        }
+        
+        function downloadAsTxt(text, filename) {
+            const element = document.createElement('a');
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+            element.setAttribute('download', filename);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+    </script>
+</body>
+</html>
