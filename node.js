@@ -1,3 +1,16 @@
+const fs = require('fs');
+// ...existing code...
+// 저장된 피드 목록 반환 (GET /feeds)
+app.get('/feeds', (req, res) => {
+    try {
+        const feedsPath = path.join(__dirname, 'feeds.json');
+        if (!fs.existsSync(feedsPath)) return res.json([]);
+        const feeds = JSON.parse(fs.readFileSync(feedsPath, 'utf-8'));
+        res.json(feeds);
+    } catch (err) {
+        res.status(500).json([]);
+    }
+});
 const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
