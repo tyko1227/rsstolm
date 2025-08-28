@@ -1,0 +1,22 @@
+[
+  {
+    "url": "https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml",
+    "title": "조선일보"
+  },
+  {
+    "url": "https://rss.donga.com/total.xml",
+    "title": "동아일보"
+  },
+  {
+    "url": "https://www.mk.co.kr/rss/40300001/",
+    "title": "매일경제"
+  },
+  {
+    "url": "https://www.yonhapnewstv.co.kr/browse/feed/",
+    "title": "연합최신뉴스"
+  },
+  {
+    "url": "https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko",
+    "title": "구글뉴스"
+  },  
+]

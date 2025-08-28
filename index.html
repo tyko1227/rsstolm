@@ -16,16 +16,21 @@
     <div class="container">
         <h1>AI 팟캐스트 생성기</h1>
         
-        <form id="rssForm">
-            <label for="rssUrl">RSS/Atom 피드 주소 (웹상의 .xml 또는 피드 주소):</label>
-            <input type="url" id="rssUrl" placeholder="https://example.com/rss.xml 또는 https://blog.example.com/feed" required>
+        <form id="feedForm">
+            <label for="feedUrl">새 피드 주소 추가:</label>
+            <input type="url" id="feedUrl" placeholder="https://example.com/rss.xml" required>
+            <button type="submit">피드 추가</button>
+        </form>
+        <div id="feedBlocks" style="margin:20px 0;"></div>
+        <form id="rssForm" style="display:none;">
             <label for="keywords">검색어 (쉼표로 구분):</label>
             <input type="text" id="keywords" placeholder="AI,기술,머신러닝">
             <button type="submit">검색</button>
         </form>
         <div style="font-size:0.9em;color:#888;margin-bottom:10px;">
-            RSS/Atom 피드 주소는 .xml 파일 또는 웹상의 피드 주소 모두 입력 가능합니다.<br>
-            <b>깃허브 Pages에서 서비스할 경우, 서버 API 주소를 직접 입력해야 할 수 있습니다.</b>
+            피드 주소를 추가하면 아래에 타이틀:피드주소 형태로 저장됩니다.<br>
+            피드 블록을 클릭하면 뉴스 검색이 활성화됩니다.<br>
+            (데이터는 브라우저에만 저장됩니다. 서버 연동은 Vercel 등에서 feeds.json을 API로 관리해야 합니다.)
         </div>
         
         <div id="results"></div>
@@ -34,19 +39,63 @@
     </div>
 
     <script>
-        // API 엔드포인트 자동 감지 (로컬/깃허브 Pages 모두 지원)
-        let apiUrl = '/process-rss';
-        if (location.hostname.endsWith('github.io')) {
-            // 깃허브 Pages에서 별도 서버 API 주소를 입력받도록 안내
-            apiUrl = prompt('API 서버 주소를 입력하세요 (예: https://your-server.com/process-rss)', '/process-rss') || '/process-rss';
+        // feeds.json을 브라우저 localStorage로 대체 (github/정적 환경)
+        const FEED_KEY = 'rss_feeds';
+        let feeds = JSON.parse(localStorage.getItem(FEED_KEY) || '[]');
+        let selectedFeed = null;
+
+        function saveFeeds() {
+            localStorage.setItem(FEED_KEY, JSON.stringify(feeds));
         }
+
+        function renderFeedBlocks() {
+            const feedBlocks = document.getElementById('feedBlocks');
+            feedBlocks.innerHTML = '';
+            feeds.forEach((feed, idx) => {
+                const block = document.createElement('div');
+                block.className = 'article';
+                block.style.cursor = 'pointer';
+                block.style.background = selectedFeed === feed.url ? '#d0f0d0' : '#f9f9f9';
+                block.innerHTML = `<b>${feed.title}</b>: <span style="font-size:0.9em;">${feed.url}</span>`;
+                block.onclick = async () => {
+                    selectedFeed = feed.url;
+                    renderFeedBlocks();
+                    document.getElementById('rssForm').style.display = 'block';
+                    document.getElementById('rssForm').dataset.feedurl = feed.url;
+                };
+                feedBlocks.appendChild(block);
+            });
+            // 피드가 없으면 입력폼 활성화, 있으면 비활성화
+            document.getElementById('feedUrl').disabled = feeds.length > 0;
+            document.querySelector('#feedForm button[type="submit"]').disabled = feeds.length > 0;
+        }
+
+        document.getElementById('feedForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const url = document.getElementById('feedUrl').value.trim();
+            if (!url || feeds.some(f => f.url === url)) return;
+            // 피드 타이틀 가져오기
+            try {
+                const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
+                const response = await fetch(proxyUrl);
+                const xmlText = await response.text();
+                const parser = new DOMParser();
+                const xml = parser.parseFromString(xmlText, 'text/xml');
+                const title = xml.querySelector('channel>title, feed>title')?.textContent || '제목 없음';
+                feeds.push({ url, title });
+                saveFeeds();
+                renderFeedBlocks();
+                document.getElementById('feedUrl').value = '';
+            } catch {
+                alert('피드 정보를 불러올 수 없습니다. 주소를 확인하세요.');
+            }
+        });
 
         document.getElementById('rssForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            const rssUrl = document.getElementById('rssUrl').value;
+            const rssUrl = e.target.dataset.feedurl;
             const keywords = document.getElementById('keywords').value.split(',').map(k => k.trim());
             const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(rssUrl);
-
             try {
                 const response = await fetch(proxyUrl);
                 const xmlText = await response.text();
@@ -103,6 +152,9 @@
             element.click();
             document.body.removeChild(element);
         }
+
+        // 최초 렌더링
+        renderFeedBlocks();
     </script>
 </body>
 </html>
