@@ -45,17 +45,27 @@
             e.preventDefault();
             const rssUrl = document.getElementById('rssUrl').value;
             const keywords = document.getElementById('keywords').value.split(',').map(k => k.trim());
+            const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(rssUrl);
+
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ rssUrl, keywords })
+                const response = await fetch(proxyUrl);
+                const xmlText = await response.text();
+                const parser = new DOMParser();
+                const xml = parser.parseFromString(xmlText, 'text/xml');
+                const items = Array.from(xml.querySelectorAll('item, entry'));
+                const articles = items.map(item => {
+                    const title = item.querySelector('title')?.textContent || '제목 없음';
+                    const description = item.querySelector('description, summary, content')?.textContent || '';
+                    const link = item.querySelector('link')?.getAttribute('href') || item.querySelector('link')?.textContent || '#';
+                    return { title, description, link };
+                }).filter(article => {
+                    if (!keywords.some(k => k)) return true;
+                    const content = (article.title + ' ' + article.description).toLowerCase();
+                    return keywords.some(keyword => keyword && content.includes(keyword.toLowerCase()));
                 });
-                if (!response.ok) throw new Error('서버 오류');
-                const data = await response.json();
-                displayResults(data.articles);
+                displayResults(articles);
             } catch (err) {
-                document.getElementById('results').innerHTML = '<p style="color:red;">RSS 처리 중 오류가 발생했습니다.<br>API 서버가 실행 중인지 확인하세요.</p>';
+                document.getElementById('results').innerHTML = '<p style="color:red;">RSS 처리 중 오류가 발생했습니다.<br>피드 주소와 CORS 정책을 확인하세요.</p>';
                 document.getElementById('downloadBtn').style.display = 'none';
             }
         });
