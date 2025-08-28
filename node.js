@@ -16,8 +16,13 @@ app.use(express.static(path.join(__dirname)));
 app.post('/process-rss', async (req, res) => {
     try {
         const { rssUrl, keywords } = req.body;
-        // 웹상의 주소, .xml 파일 모두 axios로 요청 가능
-        const response = await axios.get(rssUrl, { responseType: 'text' });
+        // 웹상의 주소, .xml 파일 모두 axios로 요청 가능 (User-Agent 추가)
+        const response = await axios.get(rssUrl, {
+            responseType: 'text',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+            }
+        });
         const result = await xml2js.parseStringPromise(response.data, { explicitArray: false, mergeAttrs: true });
 
         let items = [];
