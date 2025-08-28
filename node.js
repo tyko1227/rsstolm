@@ -30,32 +30,34 @@ app.post('/process-rss', async (req, res) => {
             items = Array.isArray(result.feed.entry) ? result.feed.entry : [result.feed.entry];
         }
 
-        // 키워드 필터링 및 데이터 정규화
-        const filteredArticles = items
-            .filter(item => {
+        // 키워드가 없거나 모두 빈 값이면 전체 기사 반환 (RSS 리더 기능)
+        let filteredArticles = items;
+        if (Array.isArray(keywords) && keywords.some(k => k.trim())) {
+            filteredArticles = items.filter(item => {
                 const title = item.title || '';
                 const description = item.description || item.summary || item.content || '';
                 const content = `${title} ${description}`.toLowerCase();
                 return keywords.some(keyword => keyword && content.includes(keyword.toLowerCase()));
-            })
-            .map(item => {
-                // 링크 추출 (RSS/Atom 모두 대응)
-                let link = '#';
-                if (item.link) {
-                    if (typeof item.link === 'string') link = item.link;
-                    else if (item.link.href) link = item.link.href;
-                    else if (Array.isArray(item.link)) {
-                        // Atom: link 배열에서 rel="alternate" 우선
-                        const alt = item.link.find(l => l.rel === 'alternate');
-                        link = (alt && alt.href) || item.link[0].href || item.link[0];
-                    }
-                }
-                return {
-                    title: item.title || '제목 없음',
-                    description: item.description || item.summary || item.content || '',
-                    link
-                };
             });
+        }
+        filteredArticles = filteredArticles.map(item => {
+            // 링크 추출 (RSS/Atom 모두 대응)
+            let link = '#';
+            if (item.link) {
+                if (typeof item.link === 'string') link = item.link;
+                else if (item.link.href) link = item.link.href;
+                else if (Array.isArray(item.link)) {
+                    // Atom: link 배열에서 rel="alternate" 우선
+                    const alt = item.link.find(l => l.rel === 'alternate');
+                    link = (alt && alt.href) || item.link[0].href || item.link[0];
+                }
+            }
+            return {
+                title: item.title || '제목 없음',
+                description: item.description || item.summary || item.content || '',
+                link
+            };
+        });
 
         res.json({ articles: filteredArticles });
     } catch (error) {
