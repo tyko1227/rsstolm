@@ -39,13 +39,18 @@
     </div>
 
     <script>
-        // feeds.json을 브라우저 localStorage로 대체 (github/정적 환경)
-        const FEED_KEY = 'rss_feeds';
-        let feeds = JSON.parse(localStorage.getItem(FEED_KEY) || '[]');
+        // 서버에서 피드 목록 불러오기 (GET /feeds)
+        let feeds = [];
         let selectedFeed = null;
 
-        function saveFeeds() {
-            localStorage.setItem(FEED_KEY, JSON.stringify(feeds));
+        async function fetchFeeds() {
+            try {
+                const res = await fetch('/feeds');
+                feeds = await res.json();
+            } catch {
+                feeds = [];
+            }
+            renderFeedBlocks();
         }
 
         function renderFeedBlocks() {
@@ -82,8 +87,9 @@
                 const parser = new DOMParser();
                 const xml = parser.parseFromString(xmlText, 'text/xml');
                 const title = xml.querySelector('channel>title, feed>title')?.textContent || '제목 없음';
+                // 서버에 피드 추가 요청 (POST /feeds) - 실제 구현 필요
+                // 임시로 클라이언트에서만 추가
                 feeds.push({ url, title });
-                saveFeeds();
                 renderFeedBlocks();
                 document.getElementById('feedUrl').value = '';
             } catch {
@@ -153,8 +159,8 @@
             document.body.removeChild(element);
         }
 
-        // 최초 렌더링
-        renderFeedBlocks();
+        // 최초 서버에서 피드 목록 불러오기
+        fetchFeeds();
     </script>
 </body>
 </html>
