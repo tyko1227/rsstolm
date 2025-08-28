@@ -17,47 +17,57 @@
         <h1>AI 팟캐스트 생성기</h1>
         
         <form id="rssForm">
-            <label for="rssUrl">RSS URL:</label>
-            <input type="url" id="rssUrl" placeholder="https://example.com/rss.xml" required>
-            
+            <label for="rssUrl">RSS/Atom 피드 주소 (웹상의 .xml 또는 피드 주소):</label>
+            <input type="url" id="rssUrl" placeholder="https://example.com/rss.xml 또는 https://blog.example.com/feed" required>
             <label for="keywords">검색어 (쉼표로 구분):</label>
             <input type="text" id="keywords" placeholder="AI,기술,머신러닝">
-            
             <button type="submit">검색</button>
         </form>
+        <div style="font-size:0.9em;color:#888;margin-bottom:10px;">
+            RSS/Atom 피드 주소는 .xml 파일 또는 웹상의 피드 주소 모두 입력 가능합니다.<br>
+            <b>깃허브 Pages에서 서비스할 경우, 서버 API 주소를 직접 입력해야 할 수 있습니다.</b>
+        </div>
         
         <div id="results"></div>
         
-        <button id="downloadBtn" style="display:none;">주소 다운로드 (TXT)</button>
+    <button id="downloadBtn" style="display:none;">주소 다운로드 (TXT)</button>
     </div>
 
     <script>
+        // API 엔드포인트 자동 감지 (로컬/깃허브 Pages 모두 지원)
+        let apiUrl = '/process-rss';
+        if (location.hostname.endsWith('github.io')) {
+            // 깃허브 Pages에서 별도 서버 API 주소를 입력받도록 안내
+            apiUrl = prompt('API 서버 주소를 입력하세요 (예: https://your-server.com/process-rss)', '/process-rss') || '/process-rss';
+        }
+
         document.getElementById('rssForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            
             const rssUrl = document.getElementById('rssUrl').value;
             const keywords = document.getElementById('keywords').value.split(',').map(k => k.trim());
-            
-            const response = await fetch('/process-rss', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rssUrl, keywords })
-            });
-            
-            const data = await response.json();
-            displayResults(data.articles);
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rssUrl, keywords })
+                });
+                if (!response.ok) throw new Error('서버 오류');
+                const data = await response.json();
+                displayResults(data.articles);
+            } catch (err) {
+                document.getElementById('results').innerHTML = '<p style="color:red;">RSS 처리 중 오류가 발생했습니다.<br>API 서버가 실행 중인지 확인하세요.</p>';
+                document.getElementById('downloadBtn').style.display = 'none';
+            }
         });
-        
+
         function displayResults(articles) {
             const resultsDiv = document.getElementById('results');
             resultsDiv.innerHTML = '';
-            
-            if (articles.length === 0) {
+            if (!articles || articles.length === 0) {
                 resultsDiv.innerHTML = '<p>검색 결과가 없습니다.</p>';
                 document.getElementById('downloadBtn').style.display = 'none';
                 return;
             }
-            
             articles.forEach(article => {
                 const articleDiv = document.createElement('div');
                 articleDiv.className = 'article';
@@ -68,14 +78,12 @@
                 `;
                 resultsDiv.appendChild(articleDiv);
             });
-            
             document.getElementById('downloadBtn').style.display = 'block';
             document.getElementById('downloadBtn').onclick = function() {
                 const links = articles.map(a => a.link).join('\n');
                 downloadAsTxt(links, 'ai_podcast_links.txt');
             };
         }
-        
         function downloadAsTxt(text, filename) {
             const element = document.createElement('a');
             element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
