@@ -1,3 +1,21 @@
+// 피드 추가 (POST /feeds)
+app.post('/feeds', (req, res) => {
+    try {
+        const { url, title } = req.body;
+        if (!url || !title) return res.status(400).json({ error: 'url, title required' });
+        const feedsPath = path.join(__dirname, 'feeds.json');
+        let feeds = [];
+        if (fs.existsSync(feedsPath)) {
+            feeds = JSON.parse(fs.readFileSync(feedsPath, 'utf-8'));
+        }
+        if (feeds.some(f => f.url === url)) return res.status(409).json({ error: 'already exists' });
+        feeds.push({ url, title });
+        fs.writeFileSync(feedsPath, JSON.stringify(feeds, null, 2), 'utf-8');
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'server error' });
+    }
+});
 const fs = require('fs');
 // ...existing code...
 // 저장된 피드 목록 반환 (GET /feeds)

@@ -87,11 +87,20 @@
                 const parser = new DOMParser();
                 const xml = parser.parseFromString(xmlText, 'text/xml');
                 const title = xml.querySelector('channel>title, feed>title')?.textContent || '제목 없음';
-                // 서버에 피드 추가 요청 (POST /feeds) - 실제 구현 필요
-                // 임시로 클라이언트에서만 추가
-                feeds.push({ url, title });
-                renderFeedBlocks();
-                document.getElementById('feedUrl').value = '';
+                // 서버에 피드 추가 요청
+                const res = await fetch('/feeds', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, title })
+                });
+                if (res.ok) {
+                    document.getElementById('feedUrl').value = '';
+                    await fetchFeeds();
+                } else if (res.status === 409) {
+                    alert('이미 등록된 피드입니다.');
+                } else {
+                    alert('서버에 피드 저장 실패');
+                }
             } catch {
                 alert('피드 정보를 불러올 수 없습니다. 주소를 확인하세요.');
             }
