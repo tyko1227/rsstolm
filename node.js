@@ -2,38 +2,61 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
 const xml2js = require('xml2js');
+const cors = require('cors');
+const path = require('path');
 const app = express();
 
+app.use(cors());
 app.use(bodyParser.json());
 
+// 정적 파일 서빙 (깃허브 Pages 호환)
+app.use(express.static(path.join(__dirname)));
+
+// RSS/Atom 피드 파싱 및 키워드 필터링
 app.post('/process-rss', async (req, res) => {
     try {
         const { rssUrl, keywords } = req.body;
-        
-        // RSS 피드 가져오기
-        const response = await axios.get(rssUrl);
-        const result = await xml2js.parseStringPromise(response.data);
-        
-        // 아이템 추출 (RSS 형식에 따라 다름)
-        const items = result.rss.channel[0].item || result.feed.entry || [];
-        
-        // 키워드 필터링
+        // 웹상의 주소, .xml 파일 모두 axios로 요청 가능
+        const response = await axios.get(rssUrl, { responseType: 'text' });
+        const result = await xml2js.parseStringPromise(response.data, { explicitArray: false, mergeAttrs: true });
+
+        let items = [];
+        // RSS 2.0
+        if (result.rss && result.rss.channel && result.rss.channel.item) {
+            items = Array.isArray(result.rss.channel.item) ? result.rss.channel.item : [result.rss.channel.item];
+        }
+        // Atom
+        else if (result.feed && result.feed.entry) {
+            items = Array.isArray(result.feed.entry) ? result.feed.entry : [result.feed.entry];
+        }
+
+        // 키워드 필터링 및 데이터 정규화
         const filteredArticles = items
             .filter(item => {
-                const title = item.title?.[0] || '';
-                const description = item.description?.[0] || '';
+                const title = item.title || '';
+                const description = item.description || item.summary || item.content || '';
                 const content = `${title} ${description}`.toLowerCase();
-                
-                return keywords.some(keyword => 
-                    keyword && content.includes(keyword.toLowerCase())
-                );
+                return keywords.some(keyword => keyword && content.includes(keyword.toLowerCase()));
             })
-            .map(item => ({
-                title: item.title?.[0] || '제목 없음',
-                description: item.description?.[0] || item.content?.[0] || '',
-                link: item.link?.[0] || item.link?.[0].$.href || '#'
-            }));
-            
+            .map(item => {
+                // 링크 추출 (RSS/Atom 모두 대응)
+                let link = '#';
+                if (item.link) {
+                    if (typeof item.link === 'string') link = item.link;
+                    else if (item.link.href) link = item.link.href;
+                    else if (Array.isArray(item.link)) {
+                        // Atom: link 배열에서 rel="alternate" 우선
+                        const alt = item.link.find(l => l.rel === 'alternate');
+                        link = (alt && alt.href) || item.link[0].href || item.link[0];
+                    }
+                }
+                return {
+                    title: item.title || '제목 없음',
+                    description: item.description || item.summary || item.content || '',
+                    link
+                };
+            });
+
         res.json({ articles: filteredArticles });
     } catch (error) {
         console.error(error);
@@ -41,4 +64,6 @@ app.post('/process-rss', async (req, res) => {
     }
 });
 
-app.listen(3000, () => console.log('서버 실행 중: http://localhost:3000'));
+// 깃허브 Pages 호환: 3000 포트가 아닌 환경도 지원
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`서버 실행 중: http://localhost:${PORT}`));
